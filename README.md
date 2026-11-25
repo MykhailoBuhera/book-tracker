@@ -9,7 +9,8 @@ SPA для пошуку книг в [Open Library](https://openlibrary.org/devel
 
 ## Можливості
 
-- каталог книг: пошук, фільтр за жанром, сортування, пагінація — усе зберігається в query-параметрах URL;
+- стартова сторінка каталогу з рекомендованими книгами: «451° за Фаренгейтом» (антиутопія), «Бійцівський клуб», «Гаррі Поттер і філософський камінь»;
+- каталог книг: пошук, фільтр за жанром (зокрема «Антиутопія»), сортування, пагінація — усе зберігається в query-параметрах URL;
 - сторінка книги (`/books/:bookId`) з описом, темами та автором;
 - сторінка автора (`/authors/:authorId`) з біографією та списком творів;
 - «Моя бібліотека» (`/library?status=read&sort=rating`): фільтр за статусом, сортування, редагування та видалення;
@@ -82,7 +83,8 @@ DTO (`SearchDocDto`, `WorkDto`, `AuthorDto`) та їх перетворення 
 
 ## Додаткові можливості (розширення)
 
-1. **Optimistic update** — видалення з бібліотеки зникає одразу й відкочується при помилці (`useRemoveLibraryEntry`).
-2. **Lazy routes / code splitting** — кожна сторінка — окремий chunk (`route.lazy` у `app/router.tsx`).
-3. **Dependent queries** — на сторінці книги автор завантажується лише після отримання `authorIds` книги.
-4. **Темна тема з persistence** — Zustand `persist`.
+1. **Optimistic update** — видалення книги з бібліотеки (`useRemoveLibraryEntry` у `features/library/model/queries.ts`):
+   запис зникає зі списку одразу, ще до відповіді repository; при помилці кеш відкочується до попереднього стану
+   й показується toast, після завершення — інвалідація `['library']`.
+2. **Темна тема з persistence** — Zustand-стор `shared/store/theme-store.ts` з middleware `persist`
+   (ключ `book-tracker:theme` у localStorage); початкове значення — системна тема `prefers-color-scheme`.
