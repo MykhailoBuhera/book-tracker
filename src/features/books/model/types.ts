@@ -34,6 +34,7 @@ export const SORT_OPTIONS = {
 export type BookSort = keyof typeof SORT_OPTIONS
 
 export const SUBJECTS = {
+  dystopia: 'Антиутопія',
   fantasy: 'Фентезі',
   science_fiction: 'Наукова фантастика',
   mystery: 'Детективи',
@@ -42,6 +43,9 @@ export const SUBJECTS = {
   programming: 'Програмування',
 } as const
 export type Subject = keyof typeof SUBJECTS
+
+/** Shown on the catalog start page: Fahrenheit 451, Fight Club, Harry Potter and the Philosopher's Stone */
+export const FEATURED_BOOK_IDS = ['OL103123W', 'OL18941W', 'OL82563W']
 
 export interface BookSearchParams {
   q: string

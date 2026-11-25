@@ -6,11 +6,16 @@ import {
   stripKey,
   type TextDto,
 } from '../../../shared/api/open-library'
-import type { Book, BookDetails, BookSearchParams, Paginated } from '../model/types'
+import type { Book, BookDetails, BookSearchParams, Paginated, Subject } from '../model/types'
 
 export const PAGE_SIZE = 12
 // Open Library gets very slow on deep offsets, so we cap pagination.
 const MAX_PAGES = 50
+// Our subject keys -> Open Library subject names (where they differ).
+// "Fiction, dystopian" is the subject that actually covers Fahrenheit 451 & co.
+const API_SUBJECTS: Partial<Record<Subject, string>> = { dystopia: 'Fiction, dystopian' }
+const SEARCH_FIELDS =
+  'key,title,author_name,author_key,first_publish_year,cover_i,edition_count,ratings_average'
 
 /* ---------- Raw API shapes (never leave this file) ---------- */
 
@@ -75,15 +80,16 @@ export const booksRepository = {
     const url = new URL(`${BASE_URL}/search.json`)
     if (params.q) url.searchParams.set('q', params.q)
     // The API needs at least one criterion; without one we browse fiction.
-    const subject = params.subject || (params.q ? '' : 'fiction')
+    const subject = params.subject
+      ? (API_SUBJECTS[params.subject] ?? params.subject)
+      : params.q
+        ? ''
+        : 'fiction'
     if (subject) url.searchParams.set('subject', subject)
     if (params.sort !== 'relevance') url.searchParams.set('sort', params.sort)
     url.searchParams.set('page', String(params.page))
     url.searchParams.set('limit', String(PAGE_SIZE))
-    url.searchParams.set(
-      'fields',
-      'key,title,author_name,author_key,first_publish_year,cover_i,edition_count,ratings_average',
-    )
+    url.searchParams.set('fields', SEARCH_FIELDS)
 
     const data = await getJson<SearchResponseDto>(url.toString(), signal)
     return {
@@ -91,6 +97,16 @@ export const booksRepository = {
       total: data.numFound,
       totalPages: Math.min(Math.ceil(data.numFound / PAGE_SIZE), MAX_PAGES),
     }
+  },
+
+  /** Several works in one request, returned in the order of `ids`. */
+  async getManyByIds(ids: string[], signal?: AbortSignal): Promise<Book[]> {
+    const url = new URL(`${BASE_URL}/search.json`)
+    url.searchParams.set('q', `key:(${ids.map((id) => `/works/${id}`).join(' OR ')})`)
+    url.searchParams.set('fields', SEARCH_FIELDS)
+    const data = await getJson<SearchResponseDto>(url.toString(), signal)
+    const books = data.docs.map(toBook)
+    return ids.flatMap((id) => books.find((b) => b.id === id) ?? [])
   },
 
   async getById(id: string, signal?: AbortSignal): Promise<BookDetails> {
