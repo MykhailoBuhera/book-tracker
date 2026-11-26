@@ -11,9 +11,12 @@ import type { Book, BookDetails, BookSearchParams, Paginated, Subject } from '..
 export const PAGE_SIZE = 12
 // Open Library gets very slow on deep offsets, so we cap pagination.
 const MAX_PAGES = 50
-// Our subject keys -> Open Library subject names (where they differ).
-// "Fiction, dystopian" is the subject that actually covers Fahrenheit 451 & co.
-const API_SUBJECTS: Partial<Record<Subject, string>> = { dystopia: 'Fiction, dystopian' }
+// Genres that need a custom Open Library query instead of the plain `subject` param.
+// Dystopia: "Fiction, dystopian" covers Fahrenheit 451 & co., and Chuck Palahniuk's
+// "Adjustment Day" (OL19739254W) is added explicitly — Open Library doesn't tag it as dystopian.
+const SUBJECT_QUERIES: Partial<Record<Subject, string>> = {
+  dystopia: 'subject:"Fiction, dystopian" OR key:"/works/OL19739254W"',
+}
 const SEARCH_FIELDS =
   'key,title,author_name,author_key,first_publish_year,cover_i,edition_count,ratings_average'
 
@@ -78,14 +81,15 @@ function toBookDetails(work: WorkDto): BookDetails {
 export const booksRepository = {
   async search(params: BookSearchParams, signal?: AbortSignal): Promise<Paginated<Book>> {
     const url = new URL(`${BASE_URL}/search.json`)
-    if (params.q) url.searchParams.set('q', params.q)
-    // The API needs at least one criterion; without one we browse fiction.
-    const subject = params.subject
-      ? (API_SUBJECTS[params.subject] ?? params.subject)
-      : params.q
-        ? ''
-        : 'fiction'
-    if (subject) url.searchParams.set('subject', subject)
+    const subjectQuery = params.subject && SUBJECT_QUERIES[params.subject]
+    if (subjectQuery) {
+      url.searchParams.set('q', params.q ? `(${params.q}) AND (${subjectQuery})` : subjectQuery)
+    } else {
+      if (params.q) url.searchParams.set('q', params.q)
+      // The API needs at least one criterion; without one we browse fiction.
+      const subject = params.subject || (params.q ? '' : 'fiction')
+      if (subject) url.searchParams.set('subject', subject)
+    }
     if (params.sort !== 'relevance') url.searchParams.set('sort', params.sort)
     url.searchParams.set('page', String(params.page))
     url.searchParams.set('limit', String(PAGE_SIZE))
